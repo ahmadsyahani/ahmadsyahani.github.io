@@ -1,0 +1,49 @@
+/* src/styles/global.css */
+@import "tailwindcss";
+
+/* --- 1. REGISTER FONTS --- */
+
+/* Regular (Weight 400) */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/SF-Pro-Display-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Medium (Weight 500) - Penting buat UI Menu/Sidebar */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/SF-Pro-Display-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Bold (Weight 700) - Buat Judul */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/SF-Pro-Display-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Semibold (Weight 600) - Opsional, buat penekanan medium */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/fonts/SF-Pro-Display-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  html {
+    /* Prioritaskan SF Pro Display, lalu fallback ke font sistem Apple */
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; /* Biar font lebih tajem ala Mac */
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

@@ -1,0 +1,432 @@
+---
+// src/pages/index.astro
+import "../styles/global.css";
+---
+
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Finder - Materi Kuliah</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    
+    <style>
+        /* Utility */
+        [x-cloak] { display: none !important; }
+
+        .finder-window { transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s; }
+        .closed { opacity: 0; transform: scale(0.9) translateY(20px); pointer-events: none; }
+        .minimized { opacity: 0; transform: scale(0.5) translateY(500px); pointer-events: none; }
+        .maximized { width: 100% !important; height: 100% !important; top: 0 !important; left: 0 !important; border-radius: 0 !important; margin: 0 !important; }
+
+        /* --- TRAFFIC LIGHTS HOVER --- */
+        .traffic-icon { opacity: 0; transition: opacity 0.15s ease-in-out; }
+        .traffic-group:hover .traffic-icon { opacity: 1; }
+        
+        /* --- SCROLLBAR --- */
+        .scroller::-webkit-scrollbar { width: 8px; height: 8px; }
+        .scroller::-webkit-scrollbar-track { background: transparent; }
+        .scroller::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+        .scroller::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
+
+        /* --- LIST VIEW --- */
+        .list-row:nth-child(even) { background-color: rgba(243, 244, 246, 0.4); }
+        .list-row:hover { background-color: #3b82f6 !important; color: white !important; }
+        .list-row:hover .text-gray-500, .list-row:hover .text-gray-400 { color: rgba(255,255,255,0.8) !important; }
+        .list-row:hover svg { color: white !important; }
+
+        /* --- GLASS DOCK (Updated) --- */
+        .glass-dock {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Tooltip animation */
+        .dock-tooltip {
+            transition: all 0.2s ease;
+            transform: translateY(10px) translateX(-50%);
+            opacity: 0;
+        }
+        .group:hover .dock-tooltip {
+            transform: translateY(0) translateX(-50%);
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body 
+  class="bg-cover bg-center h-screen w-screen overflow-hidden flex flex-col items-center justify-center selection:bg-blue-500/30 text-gray-800" 
+  style="background-image: url('/images/macos-bg.webp');">
+
+    <div class="fixed top-0 w-full h-7 bg-white/30 backdrop-blur-xl flex items-center px-4 justify-between text-xs font-medium text-white/90 z-50 shadow-sm border-b border-white/10 select-none">
+        <div class="flex gap-4 cursor-default">
+            <span class="font-bold text-base hover:text-white transition"></span>
+            <span class="font-bold">Finder</span>
+            <span class="hidden sm:inline hover:bg-white/20 px-2 rounded transition">File</span>
+            <span class="hidden sm:inline hover:bg-white/20 px-2 rounded transition">Edit</span>
+            <span class="hidden sm:inline hover:bg-white/20 px-2 rounded transition">View</span>
+            <span class="hidden sm:inline hover:bg-white/20 px-2 rounded transition">Go</span>
+            <span class="hidden sm:inline hover:bg-white/20 px-2 rounded transition">Window</span>
+            <span class="hidden sm:inline hover:bg-white/20 px-2 rounded transition">Help</span>
+        </div>
+        <div class="flex gap-3 cursor-default">
+            <span class="hover:bg-white/20 px-2 rounded transition">🔋 100%</span>
+            <span class="hover:bg-white/20 px-2 rounded transition" id="wifi-icon">🛜</span>
+            <span id="clock-display" class="hover:bg-white/20 px-2 rounded transition">Tue 17 Feb 09:41</span>
+        </div>
+    </div>
+
+    <div id="finder-window" class="finder-window w-[90%] md:w-[85%] h-[80%] bg-white/75 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/40 flex flex-col overflow-hidden relative mt-4 transition-all duration-300">
+        
+        <div class="h-14 bg-gray-100/80 border-b border-gray-300/50 flex items-center px-4 justify-between shrink-0 select-none">
+            <div class="flex items-center gap-6">
+                <div class="traffic-group flex gap-2">
+                    <button id="btn-close" class="w-3 h-3 rounded-full bg-[#FF5F57] border border-[#E0443E] shadow-sm flex items-center justify-center cursor-default">
+                        <svg class="traffic-icon w-2 h-2 text-[#4d0000]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <button id="btn-min" class="w-3 h-3 rounded-full bg-[#FEBC2E] border border-[#D89E24] shadow-sm flex items-center justify-center cursor-default">
+                        <svg class="traffic-icon w-2 h-2 text-[#4d2d00]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"></path></svg>
+                    </button>
+                    <button id="btn-max" class="w-3 h-3 rounded-full bg-[#28C840] border border-[#1AAB29] shadow-sm flex items-center justify-center cursor-default">
+                        <svg class="traffic-icon w-2 h-2 text-[#00380e]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                    </button>
+                </div>
+
+                <div class="flex gap-1 text-gray-500">
+                    <button id="btn-back" class="p-1 hover:bg-black/5 rounded transition disabled:opacity-30 disabled:cursor-default" disabled>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button class="p-1 text-gray-400 cursor-default opacity-30">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+
+                <div class="hidden md:flex items-center gap-2 text-sm font-semibold text-gray-700/90" id="window-title">
+                    <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
+                    <span id="breadcrumb-text">Materi Kuliah</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="bg-gray-300/50 rounded-md p-[2px] flex border border-gray-300/50 shadow-inner">
+                    <button id="toggle-grid" class="p-1 rounded-sm bg-white shadow-sm text-gray-700 hover:opacity-90 active:scale-95 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    </button>
+                    <button id="toggle-list" class="p-1 rounded-sm text-gray-500 hover:bg-black/5 active:scale-95 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                </div>
+                <div class="relative group">
+                    <svg class="w-3.5 h-3.5 absolute left-2.5 top-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" id="search-input" placeholder="Search" class="pl-8 pr-3 py-1 text-xs bg-white/50 rounded-md border border-gray-300/50 focus:bg-white focus:ring-2 focus:ring-blue-400/30 w-24 focus:w-40 transition-all outline-none text-gray-700 placeholder-gray-500 shadow-sm">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-1 overflow-hidden relative">
+            
+            <div class="w-48 md:w-56 bg-white/40 border-r border-gray-200/30 backdrop-blur-xl p-3 text-[13px] font-medium text-gray-600 hidden sm:flex flex-col select-none pt-4">
+                <div class="mb-6">
+                    <h3 class="px-2 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Favorites</h3>
+                    <ul class="space-y-0.5">
+                        <li onclick="navigate('home')" id="nav-home" class="sidebar-item px-2 py-1.5 rounded-md bg-black/10 text-black cursor-pointer flex items-center gap-2.5 transition-colors">
+                            <span class="text-blue-500 text-lg">🏠</span> Home
+                        </li>
+                        <li onclick="navigate('docs')" id="nav-docs" class="sidebar-item px-2 py-1.5 rounded-md hover:bg-black/5 cursor-pointer flex items-center gap-2.5 transition-colors">
+                            <span class="text-blue-400 text-lg">📄</span> Documents
+                        </li>
+                        <li onclick="navigate('downloads')" id="nav-downloads" class="sidebar-item px-2 py-1.5 rounded-md hover:bg-black/5 cursor-pointer flex items-center gap-2.5 transition-colors">
+                            <span class="text-blue-400 text-lg">⬇️</span> Downloads
+                        </li>
+                        <li onclick="navigate('recents')" id="nav-recents" class="sidebar-item px-2 py-1.5 rounded-md hover:bg-black/5 cursor-pointer flex items-center gap-2.5 transition-colors">
+                            <span class="text-gray-500 text-lg">🕒</span> Recents
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="px-2 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Locations</h3>
+                    <ul class="space-y-0.5">
+                        <li class="px-2 py-1.5 rounded-md hover:bg-black/5 cursor-pointer flex items-center gap-2.5 transition-colors">
+                            <span class="text-gray-500 text-lg">💻</span> This Mac
+                        </li>
+                        <li class="px-2 py-1.5 rounded-md hover:bg-black/5 cursor-pointer flex items-center gap-2.5 transition-colors">
+                            <span class="text-blue-400 text-lg">☁️</span> iCloud Drive
+                        </li>
+                        <li class="px-2 py-1.5 rounded-md hover:bg-black/5 cursor-pointer flex items-center gap-2.5 transition-colors">
+                            <span class="text-red-400 text-lg">🗑️</span> Trash
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flex-1 bg-white/60 overflow-hidden flex flex-col relative">
+                <div id="list-header" class="hidden h-7 border-b border-gray-200/60 flex items-center px-6 text-[11px] font-semibold text-gray-500 bg-white/40 sticky top-0 shrink-0 z-10">
+                    <div class="w-[45%]">Name</div>
+                    <div class="w-[25%]">Date Modified</div>
+                    <div class="w-[15%]">Kind</div>
+                    <div class="w-[15%]">Size</div>
+                </div>
+                <div id="content-area" class="scroller flex-1 overflow-y-auto p-5 content-start">
+                    </div>
+            </div>
+        </div>
+
+        <div class="h-6 bg-white/40 border-t border-gray-200/30 flex items-center px-4 justify-between text-[10px] font-medium text-gray-500 shrink-0 select-none backdrop-blur-sm">
+            <span id="status-count">Loading items...</span>
+            <div class="flex gap-4">
+                <span>Selection: None</span>
+                <span>67 GB available</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="fixed bottom-6 h-[72px] px-4 glass-dock rounded-2xl flex items-center gap-3 transition-transform duration-300 z-50 hover:scale-105">
+        
+        <button onclick="reopenWindow()" class="w-[50px] h-[50px] rounded-[14px] shadow-lg hover:-translate-y-2 transition-transform duration-200 relative group active:scale-95 active:brightness-90">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c9/Finder_Icon_macOS_Big_Sur.png" class="w-full h-full object-cover rounded-[14px]" alt="Finder">
+            <div id="dock-dot" class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-black/60 rounded-full transition-opacity opacity-100"></div>
+            <span class="dock-tooltip absolute -top-14 left-1/2 bg-gray-200/80 text-black/80 text-[11px] px-3 py-1 rounded-md border border-white/20 backdrop-blur-md shadow-sm font-medium pointer-events-none">Finder</span>
+        </button>
+
+        <button class="w-[50px] h-[50px] rounded-[14px] shadow-lg hover:-translate-y-2 transition-transform duration-200 relative group active:scale-95 active:brightness-90">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/5/52/Safari_browser_logo.svg" class="w-full h-full object-cover rounded-[14px]" alt="Safari">
+            <span class="dock-tooltip absolute -top-14 left-1/2 bg-gray-200/80 text-black/80 text-[11px] px-3 py-1 rounded-md border border-white/20 backdrop-blur-md shadow-sm font-medium pointer-events-none">Safari</span>
+        </button>
+
+        <button class="w-[50px] h-[50px] rounded-[14px] shadow-lg hover:-translate-y-2 transition-transform duration-200 relative group active:scale-95 active:brightness-90">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IMessage_logo.svg" class="w-full h-full object-cover rounded-[14px]" alt="Messages">
+            <span class="dock-tooltip absolute -top-14 left-1/2 bg-gray-200/80 text-black/80 text-[11px] px-3 py-1 rounded-md border border-white/20 backdrop-blur-md shadow-sm font-medium pointer-events-none">Messages</span>
+        </button>
+
+        <button class="w-[50px] h-[50px] rounded-[14px] shadow-lg hover:-translate-y-2 transition-transform duration-200 group relative active:scale-95 active:brightness-90 bg-white p-1">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/9/9a/Visual_Studio_Code_1.35_icon.svg" class="w-full h-full object-cover" alt="VS Code">
+            <span class="dock-tooltip absolute -top-14 left-1/2 bg-gray-200/80 text-black/80 text-[11px] px-3 py-1 rounded-md border border-white/20 backdrop-blur-md shadow-sm font-medium pointer-events-none">Code</span>
+        </button>
+
+        <button class="w-[50px] h-[50px] bg-white rounded-[14px] shadow-lg hover:-translate-y-2 transition-transform duration-200 group relative active:scale-95 active:brightness-90 flex items-center justify-center p-1">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/Google_Chrome_icon_%28February_2022%29.svg" class="w-full h-full object-cover" alt="Chrome">
+            <span class="dock-tooltip absolute -top-14 left-1/2 bg-gray-200/80 text-black/80 text-[11px] px-3 py-1 rounded-md border border-white/20 backdrop-blur-md shadow-sm font-medium pointer-events-none">Chrome</span>
+        </button>
+
+        <div class="w-[1px] h-10 bg-gray-400/30 mx-1"></div>
+        
+        <button class="w-[50px] h-[50px] bg-[#F1F2F4] rounded-[14px] shadow-lg hover:-translate-y-2 transition-transform duration-200 group relative active:scale-95 active:brightness-90 flex items-center justify-center border border-white/40">
+            <svg class="w-8 h-8 text-gray-400 drop-shadow-sm opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span class="dock-tooltip absolute -top-14 left-1/2 bg-gray-200/80 text-black/80 text-[11px] px-3 py-1 rounded-md border border-white/20 backdrop-blur-md shadow-sm font-medium pointer-events-none">Trash</span>
+        </button>
+    </div>
+
+    <script is:inline>
+        // DATA
+        const categories = [
+            { id: 'folder_algo', name: 'Algoritma dan Struktur', color: 'text-purple-500', date: 'Yesterday at 14:00', kind: 'Folder', size: '--' },
+            { id: 'folder_bd', name: 'Basis Data', color: 'text-blue-500', date: 'Today at 09:00', kind: 'Folder', size: '--' },
+            { id: 'folder_web', name: 'Pemrog. Web', color: 'text-orange-500', date: 'Feb 15, 2026', kind: 'Folder', size: '--' },
+            { id: 'folder_sop', name: 'Sistem Operasi', color: 'text-red-500', date: 'Jan 20, 2026', kind: 'Folder', size: '--' },
+        ];
+
+        const allFiles = [
+            { id: 'f1', parentId: 'folder_algo', name: 'pointer.html', label: 'Konsep Pointer', type: 'html', color: 'text-blue-600', date: 'Today, 09:41', size: '12 KB' },
+            { id: 'f2', parentId: 'folder_algo', name: 'structs.html', label: 'Struktur Data', type: 'html', color: 'text-emerald-600', date: 'Yesterday, 14:20', size: '15 KB' },
+            { id: 'f3', parentId: 'folder_algo', name: 'dma.html', label: 'Dynamic Memory', type: 'html', color: 'text-amber-600', date: 'Feb 17, 2026', size: '18 KB' },
+        ];
+
+        // STATE
+        let currentState = { location: 'home', viewMode: 'grid', search: '' };
+
+        // DOM ELEMENTS
+        const contentArea = document.getElementById('content-area');
+        const listHeader = document.getElementById('list-header');
+        const breadcrumb = document.getElementById('breadcrumb-text');
+        const backBtn = document.getElementById('btn-back');
+        const statusCount = document.getElementById('status-count');
+        const searchInput = document.getElementById('search-input');
+        const btnGrid = document.getElementById('toggle-grid');
+        const btnList = document.getElementById('toggle-list');
+
+        // HELPERS
+        function getIcon(type, color, isSmall = false) {
+            const size = isSmall ? "w-5 h-5" : "w-10 h-10";
+            const shadow = isSmall ? "" : "drop-shadow-md";
+            if (type === 'folder') return `<svg class="${size} ${color} ${shadow} fill-current" viewBox="0 0 24 24"><path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-6.75l-.75-2.25a3 3 0 00-3-3h-4.5a3 3 0 00-3 3v12a3 3 0 003 3h15z" /></svg>`;
+            
+            const paths = {
+                html: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+                code: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+                pdf: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z',
+                zip: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
+                def: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'
+            };
+            const p = paths[type] || paths.def;
+            return `<svg class="${size} ${color} ${shadow}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="${p}"></path></svg>`;
+        }
+
+        // RENDER
+        function render() {
+            contentArea.innerHTML = '';
+            let items = [];
+            let displayLocationName = '';
+
+            if (currentState.location === 'home') {
+                items = categories.filter(c => c.name.toLowerCase().includes(currentState.search));
+                displayLocationName = 'Home';
+                backBtn.disabled = true;
+            } else if (['docs', 'downloads', 'recents'].includes(currentState.location)) {
+                items = allFiles.filter(f => f.parentId === currentState.location && f.name.toLowerCase().includes(currentState.search));
+                displayLocationName = currentState.location.charAt(0).toUpperCase() + currentState.location.slice(1);
+                backBtn.disabled = true; 
+            } else {
+                items = allFiles.filter(f => f.parentId === currentState.location && (f.name.toLowerCase().includes(currentState.search) || f.label.toLowerCase().includes(currentState.search)));
+                const folderObj = categories.find(c => c.id === currentState.location);
+                displayLocationName = folderObj ? folderObj.name : 'Unknown';
+                backBtn.disabled = false;
+            }
+
+            breadcrumb.textContent = displayLocationName;
+            statusCount.textContent = `${items.length} item${items.length !== 1 ? 's' : ''}`;
+
+            document.querySelectorAll('.sidebar-item').forEach(el => {
+                el.classList.remove('bg-black/10', 'text-black');
+                el.classList.add('hover:bg-black/5');
+            });
+            const activeNav = document.getElementById('nav-' + (['home','docs','downloads','recents'].includes(currentState.location) ? currentState.location : 'home'));
+            if(activeNav) {
+                activeNav.classList.add('bg-black/10', 'text-black');
+                activeNav.classList.remove('hover:bg-black/5');
+            }
+
+            if (currentState.viewMode === 'grid') renderGrid(items);
+            else renderList(items);
+        }
+
+        function renderGrid(items) {
+            contentArea.className = "scroller flex-1 overflow-y-auto p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 content-start";
+            listHeader.classList.add('hidden');
+
+            if (items.length === 0) {
+                contentArea.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center text-gray-400 opacity-60 mt-20 select-none"><span class="text-5xl mb-2">📂</span><p class="text-sm">Folder is empty</p></div>`;
+                return;
+            }
+
+            items.forEach(item => {
+                const el = document.createElement('div');
+                el.className = "group flex flex-col items-center gap-2 cursor-pointer p-3 rounded-xl hover:bg-blue-100/50 transition-colors duration-200 border border-transparent hover:border-blue-200/50 select-none";
+                el.onclick = () => handleItemClick(item);
+
+                const isFolder = item.kind === 'Folder';
+                let iconHtml = '';
+                if(isFolder) {
+                    iconHtml = `<div class="w-20 h-16 relative flex items-center justify-center transition-transform group-hover:-translate-y-1">${getIcon('folder', item.color)}</div>`;
+                } else {
+                    iconHtml = `
+                    <div class="w-16 h-20 bg-white shadow-sm border border-gray-200 rounded-md flex items-center justify-center relative transition-transform group-hover:-translate-y-1">
+                        ${getIcon(item.type, item.color)}
+                        <span class="absolute -bottom-2 -right-2 bg-gray-700 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm font-bold uppercase tracking-wider">${item.type}</span>
+                    </div>`;
+                }
+
+                el.innerHTML = `
+                    ${iconHtml}
+                    <div class="text-center w-full">
+                        <p class="text-[13px] text-gray-700 font-medium truncate w-28 mx-auto group-hover:text-blue-600">${item.name || item.label}</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">${item.label || item.kind}</p>
+                    </div>
+                `;
+                contentArea.appendChild(el);
+            });
+        }
+
+        function renderList(items) {
+            contentArea.className = "scroller flex-1 overflow-y-auto p-0 flex flex-col";
+            listHeader.classList.remove('hidden'); 
+
+            if (items.length === 0) {
+                contentArea.innerHTML = `<div class="flex flex-col items-center justify-center text-gray-400 opacity-60 mt-20 select-none"><p class="text-sm">No items found</p></div>`;
+                return;
+            }
+
+            items.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = `list-row flex items-center px-6 py-1.5 text-xs text-gray-700 border-b border-gray-100 cursor-default select-none transition-colors ${index % 2 === 0 ? 'bg-transparent' : 'bg-transparent'}`;
+                el.onclick = () => handleItemClick(item);
+                
+                const isFolder = item.kind === 'Folder';
+                const icon = getIcon(isFolder ? 'folder' : item.type, item.color, true);
+
+                el.innerHTML = `
+                    <div class="w-[45%] flex items-center gap-3 font-medium truncate pr-2">
+                        ${icon}
+                        <span class="truncate">${item.name || item.label}</span>
+                    </div>
+                    <div class="w-[25%] text-gray-500 truncate">${item.date}</div>
+                    <div class="w-[15%] text-gray-500">${isFolder ? 'Folder' : (item.type.toUpperCase() + ' File')}</div>
+                    <div class="w-[15%] text-gray-500 font-mono">${item.size}</div>
+                `;
+                contentArea.appendChild(el);
+            });
+        }
+
+        function navigate(loc) {
+            currentState.location = loc;
+            currentState.search = '';
+            searchInput.value = '';
+            render();
+        }
+
+        function handleItemClick(item) {
+            if (item.kind === 'Folder') navigate(item.id);
+            else openFile(item);
+        }
+
+        function openFile(file) {
+            if (file.type === 'html') window.location.href = `/maps/${file.name}`;
+            else alert(`Opening file: ${file.name}`);
+        }
+
+        // LISTENERS
+        searchInput.addEventListener('input', (e) => { currentState.search = e.target.value.toLowerCase(); render(); });
+        btnGrid.onclick = () => { currentState.viewMode = 'grid'; updateToggleStyles(); render(); };
+        btnList.onclick = () => { currentState.viewMode = 'list'; updateToggleStyles(); render(); };
+        backBtn.onclick = () => navigate('home');
+
+        function updateToggleStyles() {
+            if (currentState.viewMode === 'grid') {
+                btnGrid.classList.add('bg-white', 'shadow-sm', 'text-gray-700'); btnGrid.classList.remove('text-gray-500', 'hover:bg-black/5');
+                btnList.classList.remove('bg-white', 'shadow-sm', 'text-gray-700'); btnList.classList.add('text-gray-500', 'hover:bg-black/5');
+            } else {
+                btnList.classList.add('bg-white', 'shadow-sm', 'text-gray-700'); btnList.classList.remove('text-gray-500', 'hover:bg-black/5');
+                btnGrid.classList.remove('bg-white', 'shadow-sm', 'text-gray-700'); btnGrid.classList.add('text-gray-500', 'hover:bg-black/5');
+            }
+        }
+
+        // WINDOW CONTROLS
+        const win = document.getElementById('finder-window');
+        const dockDot = document.getElementById('dock-dot');
+        document.getElementById('btn-close').onclick = () => { win.classList.add('closed'); dockDot.classList.remove('opacity-100'); dockDot.classList.add('opacity-0'); };
+        document.getElementById('btn-min').onclick = () => { win.classList.add('minimized'); };
+        document.getElementById('btn-max').onclick = () => { win.classList.toggle('maximized'); };
+        window.reopenWindow = () => { win.classList.remove('closed', 'minimized'); dockDot.classList.add('opacity-100'); dockDot.classList.remove('opacity-0'); };
+
+        // CLOCK
+        setInterval(() => {
+            const now = new Date();
+            const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const day = days[now.getDay()];
+            const mon = months[now.getMonth()];
+            const date = now.getDate();
+            const h = String(now.getHours()).padStart(2,'0');
+            const m = String(now.getMinutes()).padStart(2,'0');
+            document.getElementById('clock-display').textContent = `${day} ${date} ${mon} ${h}:${m}`;
+        }, 1000);
+
+        render();
+        updateToggleStyles();
+    </script>
+</body>
+</html>
